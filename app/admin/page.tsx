@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { products } from '@/lib/products'
+import { imageDefaults } from '@/lib/images'
 import { useAdmin } from '@/lib/admin-store'
 import { Plus, Edit2, Trash2, X } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
@@ -213,9 +214,10 @@ export default function AdminPage() {
                     >
                       <option value="">Select a category</option>
                       <option value="electronics">Electronics</option>
-                      <option value="fashion">Fashion</option>
-                      <option value="home">Home & Garden</option>
-                      <option value="sports">Sports</option>
+                      <option value="laptops">Laptops</option>
+                      <option value="phones">Phones</option>
+                      <option value="earphones">Earphones</option>
+                      <option value="cameras">Cameras</option>
                     </select>
                   </div>
 
@@ -301,7 +303,7 @@ export default function AdminPage() {
                       onChange={handleInputChange}
                       required
                       className="w-full bg-card border border-white/10 rounded-lg px-4 py-2 text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none"
-                      placeholder="/placeholder-1.jpg"
+                      placeholder={imageDefaults.adminImagePlaceholder}
                     />
                   </div>
                 </div>

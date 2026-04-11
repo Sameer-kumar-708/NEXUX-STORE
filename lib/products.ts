@@ -1,158 +1,76 @@
 import { Product, Category } from './types'
+import productsJson from '../public/data/products.json'
+import { categoryImages, imageDefaults } from './images'
 
-export const categories: Category[] = [
-  { id: '1', name: 'Electronics', slug: 'electronics', image: '/placeholder-cat-1.jpg' },
-  { id: '2', name: 'Fashion', slug: 'fashion', image: '/placeholder-cat-2.jpg' },
-  { id: '3', name: 'Home & Garden', slug: 'home', image: '/placeholder-cat-3.jpg' },
-  { id: '4', name: 'Sports', slug: 'sports', image: '/placeholder-cat-4.jpg' },
-]
+export interface CatalogProductJson {
+  id: number
+  category: string
+  title: string
+  badge: string
+  feature: string
+  rating: number
+  reviews: number
+  price: number
+  stock: number
+  image: string
+}
 
-export const products: Product[] = [
-  {
-    id: '1',
-    name: 'Pro Wireless Headphones',
-    description: 'High-quality wireless headphones with active noise cancellation',
-    price: 299,
-    originalPrice: 399,
-    image: '/placeholder-1.jpg',
-    category: 'electronics',
-    rating: 4.8,
-    reviews: 342,
-    stock: 15,
-    badge: 'sale',
-    specs: {
-      'Noise Cancellation': 'Active',
-      'Battery Life': '40 hours',
-      'Bluetooth': '5.3',
-    },
-  },
-  {
-    id: '2',
-    name: 'Ultra Slim Laptop',
-    description: 'Powerful performance in a sleek design',
-    price: 1299,
-    image: '/placeholder-2.jpg',
-    category: 'electronics',
-    rating: 4.9,
-    reviews: 523,
-    stock: 8,
-    badge: 'new',
-    specs: {
-      'Processor': 'Latest Gen',
-      'RAM': '16GB',
-      'Storage': '512GB SSD',
-    },
-  },
-  {
-    id: '3',
-    name: 'Premium Leather Jacket',
-    description: 'Timeless style with superior comfort',
-    price: 449,
-    originalPrice: 599,
-    image: '/placeholder-3.jpg',
-    category: 'fashion',
-    rating: 4.6,
-    reviews: 198,
-    stock: 20,
-    badge: 'trending',
-    specs: {
-      'Material': '100% Leather',
-      'Fit': 'Slim',
-      'Pockets': '6',
-    },
-  },
-  {
-    id: '4',
-    name: 'Smart Watch Pro',
-    description: 'Track your health with advanced sensors',
-    price: 399,
-    originalPrice: 499,
-    image: '/placeholder-4.jpg',
-    category: 'electronics',
-    rating: 4.7,
-    reviews: 287,
-    stock: 25,
-    badge: 'sale',
-    specs: {
-      'Display': 'AMOLED',
-      'Water Resistant': '100m',
-      'Battery': '14 days',
-    },
-  },
-  {
-    id: '5',
-    name: '4K Ultra HD Camera',
-    description: 'Professional-grade video capture',
-    price: 1899,
-    image: '/placeholder-5.jpg',
-    category: 'electronics',
-    rating: 4.9,
-    reviews: 156,
-    stock: 5,
-    badge: 'limited',
-    specs: {
-      'Resolution': '4K 60fps',
-      'Sensor': 'Full Frame',
-      'ISO Range': '100-51200',
-    },
-  },
-  {
-    id: '6',
-    name: 'Comfort Athletic Shoes',
-    description: 'Perfect for running and everyday wear',
-    price: 129,
-    originalPrice: 179,
-    image: '/placeholder-6.jpg',
-    category: 'fashion',
-    rating: 4.5,
-    reviews: 412,
-    stock: 50,
-    badge: 'sale',
-    specs: {
-      'Material': 'Mesh + Rubber',
-      'Weight': '280g',
-      'Sizes': '6-14',
-    },
-  },
-  {
-    id: '7',
-    name: 'Portable Speaker',
-    description: 'Amazing sound, fits in your pocket',
-    price: 79,
-    image: '/placeholder-7.jpg',
-    category: 'electronics',
-    rating: 4.6,
-    reviews: 523,
-    stock: 100,
-    badge: 'trending',
-    specs: {
-      'Power': '20W',
-      'Battery': '24 hours',
-      'Waterproof': 'IP67',
-    },
-  },
-  {
-    id: '8',
-    name: 'Designer Sunglasses',
-    description: 'UV protection with iconic design',
-    price: 199,
-    originalPrice: 299,
-    image: '/placeholder-8.jpg',
-    category: 'fashion',
-    rating: 4.7,
-    reviews: 289,
-    stock: 30,
-    badge: 'sale',
-    specs: {
-      'Frame': 'Premium Metal',
-      'Lens': 'Polarized',
-      'UV Protection': '100%',
-    },
-  },
-]
+function categorySlug(raw: string): string {
+  return raw.trim().toLowerCase()
+}
 
-export const trendingProducts = products.filter(
-  (p) => p.badge === 'trending' || p.badge === 'new'
-)
+function categoryDisplayName(slug: string): string {
+  return slug
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
 
-export const saleProducts = products.filter((p) => p.originalPrice)
+function mapJsonToProduct(raw: CatalogProductJson): Product {
+  const slug = categorySlug(raw.category)
+  return {
+    id: String(raw.id),
+    name: raw.title,
+    description: raw.feature,
+    price: raw.price,
+    image: raw.image || imageDefaults.productFallback,
+    category: slug,
+    rating: raw.rating,
+    reviews: raw.reviews,
+    stock: raw.stock,
+    badge: raw.badge,
+    specs: { Feature: raw.feature },
+  }
+}
+
+const rawList = productsJson as CatalogProductJson[]
+
+export const products: Product[] = rawList.map(mapJsonToProduct)
+
+const slugSet = [...new Set(products.map((p) => p.category))].sort()
+
+export const categories: Category[] = slugSet.map((slug, index) => ({
+  id: String(index + 1),
+  name: categoryDisplayName(slug),
+  slug,
+  image:
+    categoryImages[slug as keyof typeof categoryImages] ??
+    imageDefaults.productFallback,
+}))
+
+export const trendingProducts = products.filter((p) => {
+  const b = p.badge?.toLowerCase() ?? ''
+  return (
+    b === 'trending' ||
+    b === 'new' ||
+    b === 'bestseller' ||
+    b.includes('trend')
+  )
+})
+
+export const saleProducts = products.filter((p) => {
+  if (p.originalPrice != null) return true
+  const b = p.badge?.toLowerCase() ?? ''
+  return b === 'sale' || b === 'limited'
+})

@@ -130,7 +130,7 @@ export function FilterSidebar({
                 value={filters.priceRange}
                 onValueChange={handlePriceChange}
                 min={0}
-                max={2000}
+                max={5000}
                 step={50}
                 className="w-full"
               />

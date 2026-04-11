@@ -13,7 +13,7 @@ import { fadeInUp, staggerContainer } from '@/lib/animations'
 export default function ProductsPage() {
   const [filters, setFilters] = useState<FilterOptions>({
     categories: [],
-    priceRange: [0, 2000],
+    priceRange: [0, 5000],
     rating: 0,
     sortBy: 'newest',
   })
@@ -165,7 +165,7 @@ export default function ProductsPage() {
                     onClick={() =>
                       setFilters({
                         categories: [],
-                        priceRange: [0, 2000],
+                        priceRange: [0, 5000],
                         rating: 0,
                         sortBy: 'newest',
                       })

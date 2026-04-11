@@ -10,7 +10,7 @@ export interface Product {
   rating: number
   reviews: number
   stock: number
-  badge?: 'new' | 'sale' | 'trending' | 'limited'
+  badge?: string
   specs?: Record<string, string>
 }
 

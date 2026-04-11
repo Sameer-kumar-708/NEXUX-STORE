@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ShoppingCart, Heart } from 'lucide-react'
 import { Product } from '@/lib/types'
+import { getProductBadgeLabel } from '@/lib/product-badge'
 import { useCart } from '@/lib/store'
 import { useState } from 'react'
 import { hoverScale } from '@/lib/animations'
@@ -28,6 +29,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0
+  const badgeLabel = getProductBadgeLabel(product)
 
   return (
     <motion.div
@@ -49,17 +51,14 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
             />
 
             {/* Badge */}
-            {product.badge && (
+            {badgeLabel && (
               <motion.div
                 className="absolute top-3 right-3"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
                 <div className="glass px-3 py-1 rounded-full text-xs font-semibold bg-primary/20">
-                  {product.badge === 'sale' && `${discount}% OFF`}
-                  {product.badge === 'new' && 'NEW'}
-                  {product.badge === 'trending' && 'TRENDING'}
-                  {product.badge === 'limited' && 'LIMITED'}
+                  {badgeLabel}
                 </div>
               </motion.div>
             )}
@@ -75,7 +74,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
           <div className="space-y-3">
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                {product.category}
+                {product.category.replace(/-/g, ' ')}
               </p>
               <h3 className="font-semibold text-sm sm:text-base line-clamp-2 group-hover:text-primary smooth-transition">
                 {product.name}

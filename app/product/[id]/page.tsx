@@ -9,6 +9,7 @@ import { useCart } from '@/lib/store'
 import { useState } from 'react'
 import { ShoppingCart, Heart, Share2, ChevronRight, Star } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
+import { getProductBadgeLabel } from '@/lib/product-badge'
 
 interface ProductDetailPageProps {
   params: Promise<{ id: string }>
@@ -42,9 +43,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     setTimeout(() => setShowNotification(false), 2000)
   }
 
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0
+  const badgeLabel = getProductBadgeLabel(product)
 
   return (
     <main className="bg-background text-foreground">
@@ -92,12 +91,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               variants={fadeInUp}
             >
               {/* Badge */}
-              {product.badge && (
+              {badgeLabel && (
                 <div className="w-fit glass px-3 py-1 rounded-full text-xs font-semibold">
-                  {product.badge === 'sale' && `${discount}% OFF`}
-                  {product.badge === 'new' && 'NEW'}
-                  {product.badge === 'trending' && 'TRENDING'}
-                  {product.badge === 'limited' && 'LIMITED'}
+                  {badgeLabel}
                 </div>
               )}
 
