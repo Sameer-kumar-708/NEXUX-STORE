@@ -1,16 +1,22 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense } from 'react'
 import { motion } from 'framer-motion'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Navbar } from '@/components/ecommerce/navbar'
 import { FilterSidebar } from '@/components/ecommerce/filter-sidebar'
 import { ProductCard } from '@/components/ecommerce/product-card'
 import { products } from '@/lib/products'
 import { FilterOptions, Product } from '@/lib/types'
+import { filterProductsBySearch } from '@/lib/search'
 import { Filter, X } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
 
-export default function ProductsPage() {
+function ProductsPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get('q')?.trim() ?? ''
+
   const [filters, setFilters] = useState<FilterOptions>({
     categories: [],
     priceRange: [0, 5000],
@@ -37,6 +43,9 @@ export default function ProductsPage() {
       result = result.filter((p) => p.rating >= filters.rating)
     }
 
+    // Search (from URL ?q=)
+    result = filterProductsBySearch(result, searchQuery)
+
     // Sorting
     switch (filters.sortBy) {
       case 'price-low':
@@ -54,7 +63,11 @@ export default function ProductsPage() {
     }
 
     return result
-  }, [filters])
+  }, [filters, searchQuery])
+
+  const clearSearch = () => {
+    router.push('/products')
+  }
 
   return (
     <main className="bg-background text-foreground">
@@ -86,6 +99,12 @@ export default function ProductsPage() {
                   </h1>
                   <p className="text-muted-foreground">
                     Showing {filteredProducts.length} products
+                    {searchQuery ? (
+                      <span>
+                        {' '}
+                        for &ldquo;{searchQuery}&rdquo;
+                      </span>
+                    ) : null}
                   </p>
                 </div>
 
@@ -100,12 +119,27 @@ export default function ProductsPage() {
               </motion.div>
 
               {/* Active Filters Display */}
-              {(filters.categories.length > 0 || filters.rating > 0) && (
+              {(searchQuery ||
+                filters.categories.length > 0 ||
+                filters.rating > 0) && (
                 <motion.div
                   className="flex flex-wrap gap-2 mb-8"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
+                  {searchQuery && (
+                    <div className="glass px-3 py-1 rounded-full text-xs flex items-center gap-2">
+                      Search: {searchQuery}
+                      <button
+                        type="button"
+                        onClick={clearSearch}
+                        className="hover:text-primary smooth-transition"
+                        aria-label="Clear search"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                   {filters.categories.map((cat) => (
                     <div
                       key={cat}
@@ -159,20 +193,24 @@ export default function ProductsPage() {
                 >
                   <p className="text-lg font-semibold mb-2">No products found</p>
                   <p className="text-muted-foreground mb-6">
-                    Try adjusting your filters
+                    {searchQuery
+                      ? 'Try a different search or clear filters.'
+                      : 'Try adjusting your filters'}
                   </p>
                   <button
-                    onClick={() =>
+                    type="button"
+                    onClick={() => {
                       setFilters({
                         categories: [],
                         priceRange: [0, 5000],
                         rating: 0,
                         sortBy: 'newest',
                       })
-                    }
+                      if (searchQuery) clearSearch()
+                    }}
                     className="glass px-6 py-2 rounded-lg hover:border-primary/50 smooth-transition text-sm font-semibold"
                   >
-                    Clear Filters
+                    Clear filters
                   </button>
                 </motion.div>
               )}
@@ -181,5 +219,22 @@ export default function ProductsPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="bg-background text-foreground min-h-screen">
+          <Navbar />
+          <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
+            Loading…
+          </div>
+        </main>
+      }
+    >
+      <ProductsPageContent />
+    </Suspense>
   )
 }

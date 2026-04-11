@@ -1,41 +1,55 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { products } from '@/lib/products'
 import { Navbar } from '@/components/ecommerce/navbar'
 import { ProductCard } from '@/components/ecommerce/product-card'
 import { useCart } from '@/lib/store'
-import { useState } from 'react'
 import { ShoppingCart, Heart, Share2, ChevronRight, Star } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
 import { getProductBadgeLabel } from '@/lib/product-badge'
 
-interface ProductDetailPageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function ProductDetailPage({ params }: ProductDetailPageProps) {
-  const { id } = require('next/navigation').useSearchParams() ? { id: (require('next/navigation').useSearchParams()).get('id') } : { id: null }
-  
-  // Get params directly
-  const param = params as any
-  const productId = param?.id
-
-  // Find product
-  const product = products.find((p) => p.id === productId)
-  const relatedProducts = products.filter(
-    (p) => p.category === product?.category && p.id !== product?.id
-  ).slice(0, 4)
-
-  if (!product) {
-    return <div>Product not found</div>
-  }
+export default function ProductDetailPage() {
+  const params = useParams()
+  const productId = typeof params.id === 'string' ? params.id : String(params.id ?? '')
 
   const [quantity, setQuantity] = useState(1)
   const [isWishlisted, setIsWishlisted] = useState(false)
-  const { addItem } = useCart()
   const [showNotification, setShowNotification] = useState(false)
+  const { addItem } = useCart()
+
+  const product = products.find((p) => p.id === productId)
+  const relatedProducts = product
+    ? products
+        .filter(
+          (p) => p.category === product.category && p.id !== product.id
+        )
+        .slice(0, 4)
+    : []
+
+  if (!product) {
+    return (
+      <main className="bg-background text-foreground min-h-screen">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold mb-2">Product not found</h1>
+          <p className="text-muted-foreground mb-6">
+            No product matches this link.
+          </p>
+          <Link
+            href="/products"
+            className="text-primary font-semibold hover:underline"
+          >
+            Browse all products
+          </Link>
+        </div>
+      </main>
+    )
+  }
 
   const handleAddToCart = () => {
     addItem(product, quantity)
@@ -52,9 +66,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       {/* Breadcrumb */}
       <div className="border-b border-white/5 px-4 sm:px-6 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm text-muted-foreground">
-          <a href="/" className="hover:text-foreground smooth-transition">Home</a>
+          <Link href="/" className="hover:text-foreground smooth-transition">
+            Home
+          </Link>
           <ChevronRight className="w-4 h-4" />
-          <a href="/products" className="hover:text-foreground smooth-transition">Products</a>
+          <Link href="/products" className="hover:text-foreground smooth-transition">
+            Products
+          </Link>
           <ChevronRight className="w-4 h-4" />
           <span className="text-foreground">{product.name}</span>
         </div>
@@ -90,14 +108,12 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               className="flex flex-col justify-start space-y-6"
               variants={fadeInUp}
             >
-              {/* Badge */}
               {badgeLabel && (
                 <div className="w-fit glass px-3 py-1 rounded-full text-xs font-semibold">
                   {badgeLabel}
                 </div>
               )}
 
-              {/* Title */}
               <div>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
                   {product.name}
@@ -105,16 +121,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <p className="text-muted-foreground">{product.description}</p>
               </div>
 
-              {/* Rating */}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Star className="w-5 h-5 text-primary fill-primary" />
                   <span className="font-semibold">{product.rating}</span>
-                  <span className="text-muted-foreground">({product.reviews} reviews)</span>
+                  <span className="text-muted-foreground">
+                    ({product.reviews} reviews)
+                  </span>
                 </div>
               </div>
 
-              {/* Price */}
               <div className="glass p-6 rounded-xl space-y-2">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl sm:text-4xl font-bold text-primary">
@@ -127,15 +143,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   )}
                 </div>
                 <p className="text-sm text-green-400">
-                  {product.stock > 10 ? '✓ In Stock' : `Only ${product.stock} left - Order soon!`}
+                  {product.stock > 10
+                    ? '✓ In Stock'
+                    : `Only ${product.stock} left - Order soon!`}
                 </p>
               </div>
 
-              {/* Quantity */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Quantity</label>
                 <div className="flex items-center gap-4">
                   <button
+                    type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="glass px-4 py-2 rounded-lg hover:border-primary/50 smooth-transition font-semibold"
                   >
@@ -145,7 +163,10 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+                    type="button"
+                    onClick={() =>
+                      setQuantity(Math.min(product.stock, quantity + 1))
+                    }
                     className="glass px-4 py-2 rounded-lg hover:border-primary/50 smooth-transition font-semibold"
                   >
                     +
@@ -153,9 +174,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <motion.button
+                  type="button"
                   onClick={handleAddToCart}
                   className="flex-1 bg-primary text-primary-foreground py-3 sm:py-4 rounded-lg font-semibold hover:opacity-90 smooth-transition flex items-center justify-center gap-2"
                   whileHover={{ scale: 1.02 }}
@@ -165,6 +186,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   Add to Cart
                 </motion.button>
                 <motion.button
+                  type="button"
                   onClick={() => setIsWishlisted(!isWishlisted)}
                   className="glass px-4 sm:px-6 py-3 sm:py-4 rounded-lg hover:border-primary/50 smooth-transition font-semibold"
                   whileHover={{ scale: 1.02 }}
@@ -177,6 +199,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   />
                 </motion.button>
                 <motion.button
+                  type="button"
                   className="glass px-4 sm:px-6 py-3 sm:py-4 rounded-lg hover:border-primary/50 smooth-transition font-semibold"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -195,7 +218,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 </motion.p>
               )}
 
-              {/* Specifications */}
               {product.specs && (
                 <div className="glass p-6 rounded-xl space-y-4 border-t border-white/5">
                   <h3 className="font-semibold">Specifications</h3>
@@ -212,7 +234,6 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             </motion.div>
           </div>
 
-          {/* Related Products */}
           {relatedProducts.length > 0 && (
             <motion.div
               className="mt-16 sm:mt-24"

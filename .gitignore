@@ -14,3 +14,7 @@ next.user-config.*
 node_modules
 .next/
 .DS_Store
+
+# Admin-uploaded product images (keep folder via .gitkeep)
+public/uploads/products/*
+!public/uploads/products/.gitkeep
