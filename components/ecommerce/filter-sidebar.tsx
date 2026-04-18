@@ -4,8 +4,7 @@ import { motion } from 'framer-motion'
 import { Slider } from '@/components/ui/slider'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { categories } from '@/lib/products'
-import { FilterOptions } from '@/lib/types'
+import { Category, FilterOptions } from '@/lib/types'
 import { X } from 'lucide-react'
 
 interface FilterSidebarProps {
@@ -13,6 +12,7 @@ interface FilterSidebarProps {
   onFilterChange: (filters: FilterOptions) => void
   isOpen: boolean
   onClose: () => void
+  categories?: Category[]
 }
 
 export function FilterSidebar({
@@ -20,6 +20,7 @@ export function FilterSidebar({
   onFilterChange,
   isOpen,
   onClose,
+  categories = [],
 }: FilterSidebarProps) {
   const handleCategoryChange = (categoryId: string) => {
     const newCategories = filters.categories.includes(categoryId)

@@ -18,8 +18,7 @@ import {
 import { useCart } from '@/lib/store'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { products } from '@/lib/products'
-import { filterProductsBySearch } from '@/lib/search'
+import { Product } from '@/lib/types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,10 +82,24 @@ export function Navbar() {
     }
   }
 
-  const searchResults = useMemo(
-    () => filterProductsBySearch(products, searchQuery).slice(0, 6),
-    [searchQuery]
-  )
+  const [searchResults, setSearchResults] = useState<Product[]>([])
+
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (!q) {
+      setSearchResults([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      fetch(`/api/products?q=${encodeURIComponent(q)}&limit=6`)
+        .then((res) => res.json())
+        .then((data) => setSearchResults(data.products ?? []))
+        .catch(() => setSearchResults([]))
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const goToFullSearch = () => {
     const q = searchQuery.trim()

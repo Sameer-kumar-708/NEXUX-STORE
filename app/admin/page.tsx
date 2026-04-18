@@ -4,10 +4,23 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { toast } from 'sonner'
-import { products } from '@/lib/products'
 import { Navbar } from '@/components/ecommerce/navbar'
 import { Plus, Edit2, Trash2, X, Users, RefreshCw, Upload } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
+
+interface AdminProduct {
+  id: string
+  name: string
+  description: string
+  price: number
+  originalPrice?: number
+  image: string
+  category: string
+  stock: number
+  rating: number
+  reviews: number
+  badge?: string
+}
 
 interface FormData {
   name: string
@@ -17,8 +30,7 @@ interface FormData {
   image: string
   category: string
   stock: string
-  rating: string
-  reviews: string
+  badge: string
 }
 
 interface AdminUserRow {
@@ -29,74 +41,62 @@ interface AdminUserRow {
 }
 
 export default function AdminPage() {
-  const [dbUsers, setDbUsers] = useState<AdminUserRow[]>([])
-  const [usersLoading, setUsersLoading] = useState(true)
+  /* ─── Users ─────────────────────────────────────────────────────────── */
+  const [dbUsers, setDbUsers]             = useState<AdminUserRow[]>([])
+  const [usersLoading, setUsersLoading]   = useState(true)
   const [usersMigrating, setUsersMigrating] = useState(false)
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true)
     try {
       const res = await fetch('/api/admin/users', { credentials: 'same-origin' })
-      if (!res.ok) {
-        setDbUsers([])
-        return
-      }
+      if (!res.ok) { setDbUsers([]); return }
       const data = await res.json()
       setDbUsers(data.users ?? [])
-    } catch {
-      setDbUsers([])
-    } finally {
-      setUsersLoading(false)
-    }
+    } catch { setDbUsers([]) }
+    finally { setUsersLoading(false) }
   }, [])
 
-  useEffect(() => {
-    loadUsers()
-  }, [loadUsers])
+  useEffect(() => { loadUsers() }, [loadUsers])
 
   const handleMigrateRoles = async () => {
     setUsersMigrating(true)
     try {
-      const res = await fetch('/api/admin/users/migrate-roles', {
-        method: 'POST',
-        credentials: 'same-origin',
-      })
+      const res  = await fetch('/api/admin/users/migrate-roles', { method: 'POST', credentials: 'same-origin' })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(
-          typeof data.error === 'string' ? data.error : 'Could not update roles'
-        )
-        return
-      }
-      toast.success(
-        `Updated ${data.modifiedCount ?? 0} user(s): set missing role to "user" in MongoDB`
-      )
+      if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : 'Could not update roles'); return }
+      toast.success(`Updated ${data.modifiedCount ?? 0} user(s): set missing role to "user" in MongoDB`)
       await loadUsers()
-    } catch {
-      toast.error('Request failed')
-    } finally {
-      setUsersMigrating(false)
-    }
+    } catch { toast.error('Request failed') }
+    finally { setUsersMigrating(false) }
   }
 
-  const [adminProducts, setAdminProducts] = useState(products)
-  const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  /* ─── Products (from MongoDB via API) ────────────────────────────────── */
+  const [adminProducts, setAdminProducts] = useState<AdminProduct[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+
+  const loadProducts = useCallback(async () => {
+    setProductsLoading(true)
+    try {
+      const res = await fetch('/api/admin/products', { credentials: 'same-origin' })
+      if (!res.ok) { setAdminProducts([]); return }
+      const data = await res.json()
+      setAdminProducts(data.products ?? [])
+    } catch { setAdminProducts([]) }
+    finally { setProductsLoading(false) }
+  }, [])
+
+  useEffect(() => { loadProducts() }, [loadProducts])
+
+  /* ─── Form state ──────────────────────────────────────────────────────── */
+  const [showForm, setShowForm]         = useState(false)
+  const [editingId, setEditingId]       = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageFile, setImageFile]       = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const [formData, setFormData] = useState<FormData>({
-    name: '',
-    description: '',
-    price: '',
-    originalPrice: '',
-    image: '',
-    category: '',
-    stock: '',
-    rating: '',
-    reviews: '',
-  })
+  const imageInputRef                   = useRef<HTMLInputElement>(null)
+  const emptyForm: FormData = { name: '', description: '', price: '', originalPrice: '', image: '', category: '', stock: '', badge: '' }
+  const [formData, setFormData]         = useState<FormData>(emptyForm)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -104,164 +104,130 @@ export default function AdminPage() {
   }
 
   const clearImagePick = () => {
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview)
-    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
     setImagePreview(null)
     setImageFile(null)
-    if (imageInputRef.current) {
-      imageInputRef.current.value = ''
-    }
+    if (imageInputRef.current) imageInputRef.current.value = ''
   }
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview)
-    }
-    if (!file) {
-      setImageFile(null)
-      setImagePreview(null)
-      return
-    }
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file')
-      e.target.value = ''
-      return
-    }
+    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    if (!file) { setImageFile(null); setImagePreview(null); return }
+    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); e.target.value = ''; return }
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    let imageUrl = formData.image.trim()
-
-    if (imageFile) {
-      setFormSubmitting(true)
-      try {
-        const fd = new FormData()
-        fd.append('file', imageFile)
-        const res = await fetch('/api/admin/upload', {
-          method: 'POST',
-          body: fd,
-          credentials: 'same-origin',
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          toast.error(
-            typeof data.error === 'string' ? data.error : 'Image upload failed'
-          )
-          return
-        }
-        if (typeof data.url !== 'string') {
-          toast.error('Image upload failed')
-          return
-        }
-        imageUrl = data.url
-      } catch {
-        toast.error('Image upload failed')
-        return
-      } finally {
-        setFormSubmitting(false)
-      }
-    } else if (!editingId) {
-      toast.error('Please upload a product image')
-      return
-    } else if (!imageUrl) {
-      toast.error('Current product has no image — upload one to continue')
-      return
-    }
-
-    if (editingId) {
-      setAdminProducts((prev) =>
-        prev.map((p) =>
-          p.id === editingId
-            ? {
-                ...p,
-                name: formData.name,
-                description: formData.description,
-                price: parseFloat(formData.price),
-                originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
-                image: imageUrl,
-                category: formData.category,
-                stock: parseInt(formData.stock),
-                rating: parseFloat(formData.rating),
-                reviews: parseInt(formData.reviews),
-              }
-            : p
-        )
-      )
-      setEditingId(null)
-    } else {
-      const newProduct = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : undefined,
-        image: imageUrl,
-        category: formData.category,
-        stock: parseInt(formData.stock),
-        rating: parseFloat(formData.rating),
-        reviews: parseInt(formData.reviews),
-      }
-      setAdminProducts((prev) => [...prev, newProduct as any])
-    }
-
-    clearImagePick()
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      originalPrice: '',
-      image: '',
-      category: '',
-      stock: '',
-      rating: '',
-      reviews: '',
-    })
-    setShowForm(false)
+  /* ─── Upload image to Cloudinary via /api/admin/upload ──────────────── */
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return null
+    const fd = new FormData()
+    fd.append('file', imageFile)
+    const res  = await fetch('/api/admin/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : 'Image upload failed'); return null }
+    if (typeof data.url !== 'string') { toast.error('Image upload failed'); return null }
+    return data.url   // Cloudinary CDN URL
   }
 
-  const handleEdit = (product: any) => {
+  /* ─── Submit (Create or Edit) ────────────────────────────────────────── */
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormSubmitting(true)
+
+    try {
+      // 1. Upload image if a new file was picked
+      let imageUrl = formData.image.trim()
+      if (imageFile) {
+        const uploaded = await uploadImage()
+        if (!uploaded) return   // error already toasted
+        imageUrl = uploaded
+      } else if (!editingId && !imageUrl) {
+        toast.error('Please upload a product image')
+        return
+      }
+
+      // 2. Build payload
+      const body = {
+        name:          formData.name,
+        description:   formData.description,
+        price:         parseFloat(formData.price),
+        originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
+        image:         imageUrl,
+        category:      formData.category,
+        stock:         parseInt(formData.stock),
+        badge:         formData.badge || null,
+      }
+
+      // 3. Create or Update
+      if (editingId) {
+        const res  = await fetch(`/api/admin/products/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : 'Update failed'); return }
+        toast.success('Product updated!')
+      } else {
+        const res  = await fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(body),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : 'Create failed'); return }
+        toast.success('Product added!')
+      }
+
+      // 4. Refresh list from DB
+      await loadProducts()
+      handleCloseForm()
+    } finally {
+      setFormSubmitting(false)
+    }
+  }
+
+  /* ─── Edit ───────────────────────────────────────────────────────────── */
+  const handleEdit = (product: AdminProduct) => {
     clearImagePick()
     setEditingId(product.id)
     setFormData({
-      name: product.name,
-      description: product.description,
-      price: product.price.toString(),
-      originalPrice: product.originalPrice?.toString() || '',
-      image: product.image,
-      category: product.category,
-      stock: product.stock.toString(),
-      rating: product.rating.toString(),
-      reviews: product.reviews.toString(),
+      name:          product.name,
+      description:   product.description,
+      price:         product.price.toString(),
+      originalPrice: product.originalPrice?.toString() ?? '',
+      image:         product.image,
+      category:      product.category,
+      stock:         product.stock.toString(),
+      badge:         product.badge ?? '',
     })
     setShowForm(true)
   }
 
-  const handleDelete = (id: string) => {
-    setAdminProducts((prev) => prev.filter((p) => p.id !== id))
+  /* ─── Delete ─────────────────────────────────────────────────────────── */
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this product from the database?')) return
+    try {
+      const res  = await fetch(`/api/admin/products/${id}`, { method: 'DELETE', credentials: 'same-origin' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(typeof data.error === 'string' ? data.error : 'Delete failed'); return }
+      toast.success('Product deleted')
+      setAdminProducts((prev) => prev.filter((p) => p.id !== id))
+    } catch { toast.error('Delete failed') }
   }
 
+  /* ─── Close form ─────────────────────────────────────────────────────── */
   const handleCloseForm = () => {
     clearImagePick()
     setShowForm(false)
     setEditingId(null)
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      originalPrice: '',
-      image: '',
-      category: '',
-      stock: '',
-      rating: '',
-      reviews: '',
-    })
+    setFormData(emptyForm)
   }
+
 
   return (
     <main className="bg-background text-foreground min-h-screen">
@@ -281,26 +247,7 @@ export default function AdminPage() {
               <p className="text-muted-foreground mt-2">Manage your products</p>
             </div>
             <motion.button
-              onClick={() => {
-                if (showForm) {
-                  handleCloseForm()
-                } else {
-                  clearImagePick()
-                  setEditingId(null)
-                  setFormData({
-                    name: '',
-                    description: '',
-                    price: '',
-                    originalPrice: '',
-                    image: '',
-                    category: '',
-                    stock: '',
-                    rating: '',
-                    reviews: '',
-                  })
-                  setShowForm(true)
-                }
-              }}
+              onClick={() => showForm ? handleCloseForm() : setShowForm(true)}
               className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:opacity-90 smooth-transition w-fit"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -496,31 +443,14 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold mb-2">Rating</label>
+                    <label className="block text-sm font-semibold mb-2">Badge (Optional)</label>
                     <input
-                      type="number"
-                      name="rating"
-                      value={formData.rating}
+                      type="text"
+                      name="badge"
+                      value={formData.badge}
                       onChange={handleInputChange}
-                      required
-                      min="0"
-                      max="5"
-                      step="0.1"
                       className="w-full bg-card border border-white/10 rounded-lg px-4 py-2 text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none"
-                      placeholder="4.5"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold mb-2">Reviews</label>
-                    <input
-                      type="number"
-                      name="reviews"
-                      value={formData.reviews}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full bg-card border border-white/10 rounded-lg px-4 py-2 text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none"
-                      placeholder="0"
+                      placeholder="e.g. New, Sale, Trending"
                     />
                   </div>
 
@@ -629,7 +559,7 @@ export default function AdminPage() {
                     Stock
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">
-                    Rating
+                    Badge
                   </th>
                   <th className="px-6 py-4 text-right text-sm font-semibold">
                     Actions
@@ -637,65 +567,82 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                <AnimatePresence>
-                  {adminProducts.map((product) => (
-                    <motion.tr
-                      key={product.id}
-                      layout
-                      exit={{ opacity: 0, x: -100 }}
-                      className="hover:bg-card/30 smooth-transition"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <Image
-                            src={product.image}
-                            alt={product.name}
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded object-cover"
-                          />
-                          <span className="font-medium line-clamp-1">
-                            {product.name}
+                {productsLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      <RefreshCw className="w-4 h-4 animate-spin inline mr-2" />
+                      Loading products from database…
+                    </td>
+                  </tr>
+                ) : adminProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      No products yet. Click &ldquo;Add Product&rdquo; to create one.
+                    </td>
+                  </tr>
+                ) : (
+                  <AnimatePresence>
+                    {adminProducts.map((product) => (
+                      <motion.tr
+                        key={product.id}
+                        layout
+                        exit={{ opacity: 0, x: -100 }}
+                        className="hover:bg-card/30 smooth-transition"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <Image
+                              src={product.image}
+                              alt={product.name}
+                              width={40}
+                              height={40}
+                              className="w-10 h-10 rounded object-cover"
+                            />
+                            <span className="font-medium line-clamp-1">
+                              {product.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm capitalize">
+                          {product.category}
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-primary">
+                          ${product.price}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={product.stock > 10 ? 'text-green-400' : 'text-orange-400'}>
+                            {product.stock}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm capitalize">
-                        {product.category}
-                      </td>
-                      <td className="px-6 py-4 font-semibold text-primary">
-                        ${product.price}
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={product.stock > 10 ? 'text-green-400' : 'text-orange-400'}>
-                          {product.stock}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">
-                        ⭐ {product.rating} ({product.reviews})
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <motion.button
-                            onClick={() => handleEdit(product)}
-                            className="p-2 hover:bg-blue-500/10 hover:text-blue-500 rounded-lg smooth-transition"
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg smooth-transition"
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </motion.button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          {product.badge ? (
+                            <span className="glass px-2 py-0.5 rounded-full text-xs font-semibold">{product.badge}</span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <motion.button
+                              onClick={() => handleEdit(product)}
+                              className="p-2 hover:bg-blue-500/10 hover:text-blue-500 rounded-lg smooth-transition"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </motion.button>
+                            <motion.button
+                              onClick={() => handleDelete(product.id)}
+                              className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-lg smooth-transition"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </motion.button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                )}
               </tbody>
             </table>
           </div>
@@ -709,22 +656,10 @@ export default function AdminPage() {
           animate="animate"
         >
           {[
-            {
-              label: 'Total Products',
-              value: adminProducts.length,
-            },
-            {
-              label: 'Low Stock',
-              value: adminProducts.filter((p) => p.stock < 10).length,
-            },
-            {
-              label: 'Avg Rating',
-              value: (
-                (adminProducts.reduce((sum, p) => sum + p.rating, 0) /
-                  adminProducts.length) || 0
-              ).toFixed(1),
-            },
-          ].map((stat, i) => (
+            { label: 'Total Products', value: productsLoading ? '…' : adminProducts.length },
+            { label: 'Low Stock',      value: productsLoading ? '…' : adminProducts.filter((p) => p.stock < 10).length },
+            { label: 'Categories',     value: productsLoading ? '…' : new Set(adminProducts.map((p) => p.category)).size },
+          ].map((stat) => (
             <motion.div
               key={stat.label}
               className="glass p-6 rounded-xl"
