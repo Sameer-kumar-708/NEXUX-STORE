@@ -1,17 +1,35 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { siteImages } from "@/lib/images";
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
-  title: "Nexus - Premium E-commerce",
-  description: "Experience the future of shopping",
-  generator: "v0.app",
+  title: "NEXUS — Premium Tech Store",
+  description:
+    "Discover a curated collection of premium electronics. Quality meets innovation at NEXUS Store.",
+  generator: "Next.js",
+  keywords: ["electronics", "tech store", "premium", "gadgets", "nexus"],
+  openGraph: {
+    title: "NEXUS — Premium Tech Store",
+    description:
+      "Discover a curated collection of premium electronics. Quality meets innovation.",
+    type: "website",
+    siteName: "NEXUS Store",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NEXUS — Premium Tech Store",
+    description:
+      "Discover a curated collection of premium electronics.",
+  },
   icons: {
     icon: [
       {
@@ -37,8 +55,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground">
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <body className="font-sans antialiased bg-[#09090B] text-foreground">
         <Providers>{children}</Providers>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>

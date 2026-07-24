@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Navbar } from '@/components/ecommerce/navbar'
 import { FilterSidebar } from '@/components/ecommerce/filter-sidebar'
 import { ProductCard } from '@/components/ecommerce/product-card'
+import { ProductSkeletonGrid } from '@/components/ecommerce/product-skeleton'
 import { FilterOptions, Product } from '@/lib/types'
-import { Filter, X, RefreshCw } from 'lucide-react'
-import { fadeInUp, staggerContainer } from '@/lib/animations'
+import { X } from 'lucide-react'
+import { fadeInUp, staggerContainer, sectionHeaderReveal } from '@/lib/animations'
 
 function ProductsPageContent() {
   const router = useRouter()
@@ -23,7 +24,6 @@ function ProductsPageContent() {
     rating: 0,
     sortBy: 'newest',
   })
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   // Fetch products from MongoDB via the public API
   useEffect(() => {
@@ -78,7 +78,7 @@ function ProductsPageContent() {
     return result
   }, [allProducts, filters, searchQuery])
 
-  // Build dynamic categories from what's actually in the DB
+  // Build dynamic categories from DB
   const dynamicCategories = useMemo(
     () =>
       [...new Set(allProducts.map((p) => p.category))].sort().map((slug, i) => ({
@@ -96,131 +96,163 @@ function ProductsPageContent() {
   const clearSearch = () => router.push('/products')
 
   return (
-    <main className="bg-background text-foreground">
+    <main className="bg-[#09090B] text-foreground min-h-screen">
       <Navbar />
 
-      <div className="flex h-[calc(100vh-64px)] sm:h-[calc(100vh-80px)]">
-        <FilterSidebar
-          filters={filters}
-          onFilterChange={setFilters}
-          isOpen={isFilterOpen}
-          onClose={() => setIsFilterOpen(false)}
-          categories={dynamicCategories}
-        />
+      <div className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Page Header */}
+          <motion.div
+            className="mb-6"
+            variants={sectionHeaderReveal}
+            initial="initial"
+            animate="animate"
+          >
+            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+              {searchQuery ? 'Search Results' : 'All Products'}
+            </h1>
+            <p className="text-gray-500 text-sm">
+              {loading
+                ? 'Loading...'
+                : `Showing ${filteredProducts.length} products`}
+              {searchQuery && !loading && (
+                <span>
+                  {' '}
+                  for &ldquo;<span className="text-gray-300">{searchQuery}</span>&rdquo;
+                </span>
+              )}
+            </p>
+          </motion.div>
 
-        <div className="flex-1 overflow-auto">
-          <div className="min-h-screen py-8 sm:py-16 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-7xl mx-auto">
+          {/* Horizontal Filter Bar */}
+          <FilterSidebar
+            filters={filters}
+            onFilterChange={setFilters}
+            categories={dynamicCategories}
+          />
+
+          {/* Active Filter Chips */}
+          <AnimatePresence>
+            {(searchQuery || filters.categories.length > 0 || filters.rating > 0 || filters.priceRange[0] > 0 || filters.priceRange[1] < 5000) && (
               <motion.div
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 mb-8 sm:mb-12"
-                variants={fadeInUp}
-                initial="initial"
-                animate="animate"
+                className="flex flex-wrap items-center gap-2 mb-6"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
               >
-                <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold mb-2">All Products</h1>
-                  <p className="text-muted-foreground">
-                    {loading ? 'Loading…' : `Showing ${filteredProducts.length} products`}
-                    {searchQuery && !loading && (
-                      <span> for &ldquo;{searchQuery}&rdquo;</span>
-                    )}
-                  </p>
-                </div>
+                {searchQuery && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] text-white border border-white/10">
+                    <span>Search: {searchQuery}</span>
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="hover:text-gray-300 smooth-transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
 
-                <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  className="md:hidden flex items-center gap-2 glass px-4 py-2 rounded-lg hover:border-primary/50 smooth-transition w-fit"
-                >
-                  <Filter className="w-4 h-4" />
-                  {isFilterOpen ? 'Hide' : 'Show'} Filters
-                </button>
-              </motion.div>
-
-              {/* Active Filters Tags */}
-              {(searchQuery || filters.categories.length > 0 || filters.rating > 0) && (
-                <motion.div
-                  className="flex flex-wrap gap-2 mb-8"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  {searchQuery && (
-                    <div className="glass px-3 py-1 rounded-full text-xs flex items-center gap-2">
-                      Search: {searchQuery}
-                      <button type="button" onClick={clearSearch} className="hover:text-primary smooth-transition" aria-label="Clear search">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                  {filters.categories.map((cat) => (
-                    <div key={cat} className="glass px-3 py-1 rounded-full text-xs flex items-center gap-2">
-                      {cat}
-                      <button
-                        onClick={() => setFilters({ ...filters, categories: filters.categories.filter((c) => c !== cat) })}
-                        className="hover:text-primary smooth-transition"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {filters.rating > 0 && (
-                    <div className="glass px-3 py-1 rounded-full text-xs flex items-center gap-2">
-                      {filters.rating}+ stars
-                      <button onClick={() => setFilters({ ...filters, rating: 0 })} className="hover:text-primary smooth-transition">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-
-              {/* Loading spinner */}
-              {loading && (
-                <div className="flex items-center justify-center py-24 text-muted-foreground">
-                  <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                  Loading products…
-                </div>
-              )}
-
-              {/* Products Grid */}
-              {!loading && filteredProducts.length > 0 && (
-                <motion.div
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
-                  variants={staggerContainer}
-                  initial="initial"
-                  animate="animate"
-                >
-                  {filteredProducts.map((product, index) => (
-                    <ProductCard key={product.id} product={product} index={index} />
-                  ))}
-                </motion.div>
-              )}
-
-              {/* Empty state */}
-              {!loading && filteredProducts.length === 0 && (
-                <motion.div
-                  className="flex flex-col items-center justify-center py-12 text-center"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <p className="text-lg font-semibold mb-2">No products found</p>
-                  <p className="text-muted-foreground mb-6">
-                    {searchQuery
-                      ? 'Try a different search or clear filters.'
-                      : allProducts.length === 0
-                      ? 'No products have been added yet.'
-                      : 'Try adjusting your filters.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => { setFilters({ categories: [], priceRange: [0, 5000], rating: 0, sortBy: 'newest' }); if (searchQuery) clearSearch() }}
-                    className="glass px-6 py-2 rounded-lg hover:border-primary/50 smooth-transition text-sm font-semibold"
+                {filters.categories.map((cat) => (
+                  <div
+                    key={cat}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] text-white border border-white/10 capitalize"
                   >
-                    Clear filters
-                  </button>
-                </motion.div>
-              )}
-            </div>
-          </div>
+                    <span>{cat}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFilters({
+                          ...filters,
+                          categories: filters.categories.filter((c) => c !== cat),
+                        })
+                      }
+                      className="hover:text-gray-300 smooth-transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {(filters.priceRange[0] > 0 || filters.priceRange[1] < 5000) && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] text-white border border-white/10">
+                    <span>${filters.priceRange[0]} - ${filters.priceRange[1]}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFilters({ ...filters, priceRange: [0, 5000] })}
+                      className="hover:text-gray-300 smooth-transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {filters.rating > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] text-white border border-white/10">
+                    <span>{filters.rating}+ Stars</span>
+                    <button
+                      type="button"
+                      onClick={() => setFilters({ ...filters, rating: 0 })}
+                      className="hover:text-gray-300 smooth-transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Loading Skeleton */}
+          {loading && <ProductSkeletonGrid count={8} />}
+
+          {/* Products Grid */}
+          {!loading && filteredProducts.length > 0 && (
+            <motion.div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+              variants={staggerContainer}
+              initial="initial"
+              animate="animate"
+            >
+              {filteredProducts.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </motion.div>
+          )}
+
+          {/* Empty state */}
+          {!loading && filteredProducts.length === 0 && (
+            <motion.div
+              className="flex flex-col items-center justify-center py-20 text-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="text-7xl mb-6">🔍</div>
+              <h2 className="text-2xl font-bold text-white mb-3">No products found</h2>
+              <p className="text-gray-400 mb-8 max-w-md">
+                {searchQuery
+                  ? 'Try a different search term or adjust your filters.'
+                  : allProducts.length === 0
+                  ? 'No products have been added yet. Check back soon!'
+                  : 'Try adjusting your filters to see more results.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters({
+                    categories: [],
+                    priceRange: [0, 5000],
+                    rating: 0,
+                    sortBy: 'newest',
+                  })
+                  if (searchQuery) clearSearch()
+                }}
+                className="btn-solid inline-flex items-center gap-2 text-sm"
+              >
+                Clear all filters
+              </button>
+            </motion.div>
+          )}
         </div>
       </div>
     </main>
@@ -231,10 +263,13 @@ export default function ProductsPage() {
   return (
     <Suspense
       fallback={
-        <main className="bg-background text-foreground min-h-screen">
+        <main className="bg-[#09090B] text-foreground min-h-screen">
           <Navbar />
-          <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
-            Loading…
+          <div className="py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <div className="h-10 w-48 rounded-full shimmer bg-white/[0.03] mb-8" />
+              <ProductSkeletonGrid count={8} />
+            </div>
           </div>
         </main>
       }
