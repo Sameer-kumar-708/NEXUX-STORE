@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "sync:vectors": "npx tsx scripts/seed-vectors.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.14.0",
     "@hookform/resolvers": "^3.9.1",
+    "@pinecone-database/pinecone": "^8.1.0",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
@@ -44,6 +47,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
+    "dotenv": "^17.4.2",
     "embla-carousel-react": "8.6.0",
     "framer-motion": "^11.0.0",
     "input-otp": "1.4.2",
@@ -60,6 +64,7 @@
     "recharts": "2.15.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
+    "tsx": "^4.23.1",
     "vaul": "^1.1.2",
     "zod": "^3.24.1",
     "zustand": "^4.4.0"

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Navbar } from '@/components/ecommerce/navbar'
-import { Plus, Edit2, Trash2, X, Users, RefreshCw, Upload } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Users, RefreshCw, Upload, Clipboard } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/lib/animations'
 
 interface AdminProduct {
@@ -88,12 +88,43 @@ export default function AdminPage() {
 
   useEffect(() => { loadProducts() }, [loadProducts])
 
+  /* ─── Categories state & logic ────────────────────────────────────────── */
+  const defaultCategories = ['electronics', 'laptops', 'phones', 'earphones', 'cameras', 'watches']
+  const [customCategories, setCustomCategories] = useState<string[]>([])
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false)
+  const [newCategoryInput, setNewCategoryInput] = useState('')
+
+  const availableCategories = Array.from(
+    new Set([
+      ...defaultCategories,
+      ...adminProducts.map((p) => p.category.toLowerCase()),
+      ...customCategories.map((c) => c.toLowerCase()),
+    ])
+  ).filter(Boolean).sort()
+
+  const handleAddNewCategory = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const trimmed = newCategoryInput.trim().toLowerCase()
+    if (!trimmed) {
+      toast.error('Please enter a category name')
+      return
+    }
+    if (!customCategories.includes(trimmed)) {
+      setCustomCategories((prev) => [...prev, trimmed])
+    }
+    setFormData((prev) => ({ ...prev, category: trimmed }))
+    setIsAddingNewCategory(false)
+    setNewCategoryInput('')
+    toast.success(`Category "${trimmed}" added and selected!`)
+  }
+
   /* ─── Form state ──────────────────────────────────────────────────────── */
   const [showForm, setShowForm]         = useState(false)
   const [editingId, setEditingId]       = useState<string | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [imageFile, setImageFile]       = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isDragging, setIsDragging]     = useState(false)
   const imageInputRef                   = useRef<HTMLInputElement>(null)
   const emptyForm: FormData = { name: '', description: '', price: '', originalPrice: '', image: '', category: '', stock: '', badge: '' }
   const [formData, setFormData]         = useState<FormData>(emptyForm)
@@ -104,19 +135,180 @@ export default function AdminPage() {
   }
 
   const clearImagePick = () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview)
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview)
+    }
     setImagePreview(null)
     setImageFile(null)
     if (imageInputRef.current) imageInputRef.current.value = ''
   }
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (imagePreview) URL.revokeObjectURL(imagePreview)
-    if (!file) { setImageFile(null); setImagePreview(null); return }
-    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); e.target.value = ''; return }
+  const handleImageFile = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose or paste an image file')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be max 5MB')
+      return
+    }
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview)
+    }
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    toast.success('Image set from file / paste!')
+  }, [imagePreview])
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) { clearImagePick(); return }
+    handleImageFile(file)
+  }
+
+  /* ─── Copy & Paste Handling for Images ──────────────────────────────── */
+  const processPastedItems = useCallback(
+    (clipboardData: DataTransfer) => {
+      // 1. Files in clipboard (e.g. copied image file or screenshot)
+      if (clipboardData.files && clipboardData.files.length > 0) {
+        for (let i = 0; i < clipboardData.files.length; i++) {
+          const file = clipboardData.files[i]
+          if (file.type.startsWith('image/')) {
+            handleImageFile(file)
+            return true
+          }
+        }
+      }
+
+      // 2. Items in clipboard (e.g. image blob)
+      if (clipboardData.items) {
+        for (let i = 0; i < clipboardData.items.length; i++) {
+          const item = clipboardData.items[i]
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (file) {
+              handleImageFile(file)
+              return true
+            }
+          }
+        }
+      }
+
+      // 3. Text content in clipboard (e.g. image URL)
+      const text = clipboardData.getData('text')?.trim()
+      if (
+        text &&
+        (text.startsWith('http://') ||
+          text.startsWith('https://') ||
+          text.startsWith('data:image/'))
+      ) {
+        if (imagePreview && imagePreview.startsWith('blob:')) {
+          URL.revokeObjectURL(imagePreview)
+        }
+        setImageFile(null)
+        setImagePreview(text)
+        setFormData((prev) => ({ ...prev, image: text }))
+        toast.success('Pasted image URL from clipboard!')
+        return true
+      }
+
+      return false
+    },
+    [handleImageFile, imagePreview]
+  )
+
+  useEffect(() => {
+    if (!showForm) return
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      if (!e.clipboardData) return
+      // Ignore if user is currently typing text inside standard inputs/textareas unless it's an image file paste
+      const target = e.target as HTMLElement
+      const isTextInput =
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') &&
+        (target as HTMLInputElement).name !== 'image'
+
+      const hasImageFile = Array.from(e.clipboardData.items || []).some((item) =>
+        item.type.startsWith('image/')
+      )
+
+      if (!isTextInput || hasImageFile) {
+        const handled = processPastedItems(e.clipboardData)
+        if (handled) {
+          e.preventDefault()
+        }
+      }
+    }
+
+    window.addEventListener('paste', handleWindowPaste)
+    return () => window.removeEventListener('paste', handleWindowPaste)
+  }, [showForm, processPastedItems])
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read()
+        for (const item of items) {
+          const imageType = item.types.find((type) => type.startsWith('image/'))
+          if (imageType) {
+            const blob = await item.getType(imageType)
+            const file = new File(
+              [blob],
+              `pasted-image-${Date.now()}.${imageType.split('/')[1] || 'png'}`,
+              { type: imageType }
+            )
+            handleImageFile(file)
+            return
+          }
+        }
+      }
+
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText()
+        const trimmed = text.trim()
+        if (
+          trimmed.startsWith('http://') ||
+          trimmed.startsWith('https://') ||
+          trimmed.startsWith('data:image/')
+        ) {
+          if (imagePreview && imagePreview.startsWith('blob:')) {
+            URL.revokeObjectURL(imagePreview)
+          }
+          setImageFile(null)
+          setImagePreview(trimmed)
+          setFormData((prev) => ({ ...prev, image: trimmed }))
+          toast.success('Pasted image URL!')
+          return
+        }
+      }
+
+      toast.error('No image or image URL found in clipboard')
+    } catch {
+      toast.error('Could not access clipboard automatically. Please press Ctrl+V.')
+    }
+  }
+
+  /* ─── Drag & Drop Handlers ────────────────────────────────────────── */
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0]
+      handleImageFile(file)
+    }
   }
 
   /* ─── Upload image to Cloudinary via /api/admin/upload ──────────────── */
@@ -381,23 +573,78 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold mb-2">
-                      Category
-                    </label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full bg-card border border-white/10 rounded-lg px-4 py-2 text-foreground focus:border-primary focus:outline-none"
-                    >
-                      <option value="">Select a category</option>
-                      <option value="electronics">Electronics</option>
-                      <option value="laptops">Laptops</option>
-                      <option value="phones">Phones</option>
-                      <option value="earphones">Earphones</option>
-                      <option value="cameras">Cameras</option>
-                    </select>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-semibold">
+                        Category
+                      </label>
+                      {!isAddingNewCategory ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingNewCategory(true)}
+                          className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add New Category
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingNewCategory(false)}
+                          className="text-xs text-muted-foreground hover:underline"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+
+                    {!isAddingNewCategory ? (
+                      <select
+                        name="category"
+                        value={formData.category}
+                        onChange={(e) => {
+                          if (e.target.value === '__add_new__') {
+                            setIsAddingNewCategory(true)
+                          } else {
+                            handleInputChange(e)
+                          }
+                        }}
+                        required
+                        className="w-full bg-card border border-white/10 rounded-lg px-4 py-2 text-foreground focus:border-primary focus:outline-none capitalize"
+                      >
+                        <option value="">Select a category</option>
+                        {availableCategories.map((cat) => (
+                          <option key={cat} value={cat} className="capitalize">
+                            {cat}
+                          </option>
+                        ))}
+                        <option value="__add_new__" className="text-primary font-semibold">
+                          + Add New Category...
+                        </option>
+                      </select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                          placeholder="e.g. Watch, Shoes, Accessories"
+                          className="flex-1 bg-card border border-primary/50 rounded-lg px-4 py-2 text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleAddNewCategory()
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddNewCategory()}
+                          className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 smooth-transition"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -455,14 +702,36 @@ export default function AdminPage() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-semibold mb-2">
-                      Product image
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-semibold">
+                        Product image
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handlePasteFromClipboard}
+                        className="inline-flex items-center gap-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-2.5 py-1 rounded-lg font-medium smooth-transition"
+                      >
+                        <Clipboard className="w-3.5 h-3.5" />
+                        Paste from Clipboard (Ctrl+V)
+                      </button>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row gap-4 items-start">
-                      <label className="flex flex-col items-center justify-center w-full sm:w-48 h-36 border-2 border-dashed border-white/20 rounded-xl cursor-pointer hover:border-primary/50 smooth-transition bg-card/50">
-                        <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                        <span className="text-xs text-muted-foreground text-center px-2">
-                          Click to upload
+                      <div
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => imageInputRef.current?.click()}
+                        className={`flex flex-col items-center justify-center w-full sm:w-64 h-36 border-2 border-dashed rounded-xl cursor-pointer smooth-transition bg-card/50 relative p-4 text-center ${
+                          isDragging ? 'border-primary bg-primary/10' : 'border-white/20 hover:border-primary/50'
+                        }`}
+                      >
+                        <Upload className="w-7 h-7 text-muted-foreground mb-1.5" />
+                        <span className="text-xs font-medium text-foreground">
+                          Click to upload or drag & drop
+                        </span>
+                        <span className="text-[11px] text-primary/90 mt-1 font-medium">
+                          Or press Ctrl+V to paste image
                         </span>
                         <span className="text-[10px] text-muted-foreground mt-1">
                           JPEG, PNG, WebP, GIF · max 5MB
@@ -474,21 +743,37 @@ export default function AdminPage() {
                           className="sr-only"
                           onChange={handleImageFileChange}
                         />
-                      </label>
+                      </div>
+
                       {(imagePreview || formData.image) && (
-                        <div className="relative w-full sm:flex-1 max-w-xs aspect-square rounded-xl overflow-hidden border border-white/10 bg-muted">
+                        <div className="relative w-full sm:w-36 h-36 rounded-xl overflow-hidden border border-white/10 bg-muted group">
                           <img
                             src={imagePreview || formData.image}
-                            alt=""
+                            alt="Preview"
                             className="absolute inset-0 h-full w-full object-cover"
                           />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              clearImagePick()
+                              setFormData((prev) => ({ ...prev, image: '' }))
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 hover:bg-red-600 text-white opacity-90 transition-opacity"
+                            title="Remove image"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-0 inset-x-0 bg-black/70 backdrop-blur-xs py-1 text-[10px] text-center text-white/90 font-mono truncate px-1">
+                            {imageFile ? 'File / Pasted' : 'Image URL'}
+                          </div>
                         </div>
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
                       {editingId
-                        ? 'Upload a new file to replace the current image, or leave unchanged.'
-                        : 'An image is required for new products.'}
+                        ? 'Upload or paste a new image to replace the current image, or leave unchanged.'
+                        : 'An image is required. You can choose a file, drag & drop, or copy & paste (Ctrl+V).'}
                     </p>
                   </div>
                 </div>

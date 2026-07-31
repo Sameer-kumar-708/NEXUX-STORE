@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import { connectDB } from '@/lib/mongodb'
 import { Product } from '@/lib/models/Product'
 import { requireAdminApi } from '@/lib/auth/require-admin'
+import { upsertProductVector, deleteProductVector, ProductDocument } from '@/lib/vector-sync'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -92,6 +93,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
+    // Trigger async vector upsert on Pinecone
+    upsertProductVector(updated as unknown as ProductDocument).catch((err) => {
+      console.error('[Async Pinecone Upsert Error]:', err)
+    })
+
     return NextResponse.json({
       message: 'Product updated',
       product: mapProduct(updated as Record<string, unknown>),
@@ -123,6 +129,12 @@ export async function DELETE(
     if (!deleted) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
+
+    // Delete vector from Pinecone
+    deleteProductVector(id).catch((err) => {
+      console.error('[Async Pinecone Delete Error]:', err)
+    })
+
     return NextResponse.json({ message: 'Product deleted', id })
   } catch (err) {
     console.error('[DELETE /api/admin/products/[id]]', err)

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { connectDB } from '@/lib/mongodb'
 import { Product } from '@/lib/models/Product'
 import { requireAdminApi } from '@/lib/auth/require-admin'
+import { upsertProductVector } from '@/lib/vector-sync'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -111,7 +112,12 @@ export async function POST(request: Request) {
       reviews: 0,
     })
 
-    // 4. Return the newly created product
+    // 4. Trigger real-time Pinecone vector indexing asynchronously
+    upsertProductVector(product).catch((err) => {
+      console.error('[Async Pinecone Upsert Error]:', err)
+    })
+
+    // 5. Return the newly created product
     return NextResponse.json(
       {
         message: 'Product created successfully',

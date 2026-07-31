@@ -8,7 +8,7 @@ import { FilterSidebar } from '@/components/ecommerce/filter-sidebar'
 import { ProductCard } from '@/components/ecommerce/product-card'
 import { ProductSkeletonGrid } from '@/components/ecommerce/product-skeleton'
 import { FilterOptions, Product } from '@/lib/types'
-import { X } from 'lucide-react'
+import { X, Sparkles } from 'lucide-react'
 import { fadeInUp, staggerContainer, sectionHeaderReveal } from '@/lib/animations'
 
 function ProductsPageContent() {
@@ -17,6 +17,12 @@ function ProductsPageContent() {
   const searchQuery = searchParams.get('q')?.trim() ?? ''
 
   const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [semanticProducts, setSemanticProducts] = useState<Product[] | null>(null)
+  const [aiInterpretation, setAiInterpretation] = useState<{
+    interpretedQuery?: string
+    explanation?: string
+    filtersExtracted?: Record<string, unknown>
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<FilterOptions>({
     categories: [],
@@ -25,18 +31,40 @@ function ProductsPageContent() {
     sortBy: 'newest',
   })
 
-  // Fetch products from MongoDB via the public API
+  // Fetch products or perform AI semantic search
   useEffect(() => {
     setLoading(true)
-    fetch('/api/products?limit=200')
-      .then((r) => r.json())
-      .then((data) => setAllProducts(data.products ?? []))
-      .catch(() => setAllProducts([]))
-      .finally(() => setLoading(false))
-  }, [])
+
+    if (searchQuery) {
+      // Use Multilingual Semantic Search API (Gemini + Pinecone)
+      fetch(`/api/search/semantic?q=${encodeURIComponent(searchQuery)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setSemanticProducts(data.products ?? [])
+          setAiInterpretation({
+            interpretedQuery: data.interpretedQuery,
+            explanation: data.explanation,
+            filtersExtracted: data.filtersExtracted,
+          })
+        })
+        .catch(() => {
+          setSemanticProducts([])
+          setAiInterpretation(null)
+        })
+        .finally(() => setLoading(false))
+    } else {
+      setSemanticProducts(null)
+      setAiInterpretation(null)
+      fetch('/api/products?limit=200')
+        .then((r) => r.json())
+        .then((data) => setAllProducts(data.products ?? []))
+        .catch(() => setAllProducts([]))
+        .finally(() => setLoading(false))
+    }
+  }, [searchQuery])
 
   const filteredProducts = useMemo(() => {
-    let result: Product[] = [...allProducts]
+    let result: Product[] = semanticProducts !== null ? [...semanticProducts] : [...allProducts]
 
     if (filters.categories.length > 0) {
       result = result.filter((p) => filters.categories.includes(p.category))
@@ -50,7 +78,8 @@ function ProductsPageContent() {
       result = result.filter((p) => p.rating >= filters.rating)
     }
 
-    if (searchQuery) {
+    // Standard filter for static catalog when no AI semantic search was performed
+    if (searchQuery && semanticProducts === null) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
         (p) =>
@@ -76,7 +105,7 @@ function ProductsPageContent() {
     }
 
     return result
-  }, [allProducts, filters, searchQuery])
+  }, [allProducts, semanticProducts, filters, searchQuery])
 
   // Build dynamic categories from DB
   const dynamicCategories = useMemo(
@@ -108,8 +137,14 @@ function ProductsPageContent() {
             initial="initial"
             animate="animate"
           >
-            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 flex items-center gap-3">
               {searchQuery ? 'Search Results' : 'All Products'}
+              {searchQuery && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-400 border border-blue-500/30">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  AI Vector Search
+                </span>
+              )}
             </h1>
             <p className="text-gray-500 text-sm">
               {loading
@@ -123,6 +158,36 @@ function ProductsPageContent() {
               )}
             </p>
           </motion.div>
+
+          {/* AI Search Intent Interpretation Banner */}
+          {searchQuery && !loading && aiInterpretation?.interpretedQuery && (
+            <motion.div
+              className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-purple-950/30 to-black border border-blue-500/20 backdrop-blur-md flex items-start gap-3.5 shadow-lg"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                    Gemini AI Multilingual Interpretation
+                  </span>
+                  {aiInterpretation.interpretedQuery !== searchQuery && (
+                    <span className="text-xs text-gray-300 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10">
+                      English keywords: &ldquo;<strong className="text-white">{aiInterpretation.interpretedQuery}</strong>&rdquo;
+                    </span>
+                  )}
+                </div>
+                {aiInterpretation.explanation && (
+                  <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
+                    {aiInterpretation.explanation}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Horizontal Filter Bar */}
           <FilterSidebar

@@ -23,6 +23,7 @@ import {
   Tag,
   MapPin,
   Flame,
+  Sparkles,
 } from 'lucide-react'
 import { useCart } from '@/lib/store'
 import { useCallback, useEffect, useState } from 'react'
@@ -86,14 +87,14 @@ export function Navbar() {
     const q = searchQuery.trim()
     if (!q) { setSearchResults([]); setSelectedIndex(0); return }
     const timer = setTimeout(() => {
-      fetch(`/api/products?q=${encodeURIComponent(q)}&limit=6`)
+      fetch(`/api/search/semantic?q=${encodeURIComponent(q)}`)
         .then((res) => res.json())
         .then((data) => {
           setSearchResults(data.products ?? [])
           setSelectedIndex(0)
         })
         .catch(() => setSearchResults([]))
-    }, 200)
+    }, 250)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
@@ -512,16 +513,16 @@ export function Navbar() {
           }}
         >
           <DialogTitle className="sr-only">Search products</DialogTitle>
-          {/* Top Pill Search Bar (Matching image top input style) */}
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/10 focus-within:border-[#3B82F6] focus-within:ring-2 focus-within:ring-[#3B82F6]/20 smooth-transition mb-4">
-            <Search className="w-4 h-4 text-gray-400 shrink-0" />
+          {/* Top Pill Search Bar */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/[0.06] border border-white/10 focus-within:border-[#3B82F6] focus-within:ring-2 focus-within:ring-[#3B82F6]/20 smooth-transition mb-3">
+            <Sparkles className="w-4 h-4 text-[#3B82F6] shrink-0" />
             <input
               autoFocus
-              placeholder="Search products, categories..."
+              placeholder="Type in any language (e.g. 'Mujhe laptop chaiye', 'phone under $300')..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full bg-transparent border-none text-white placeholder-gray-400 text-sm focus:outline-none"
+              className="w-full bg-transparent border-none text-white placeholder-gray-400 text-xs sm:text-sm focus:outline-none"
             />
             {searchQuery ? (
               <button
@@ -542,6 +543,14 @@ export function Navbar() {
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* AI Multilingual Badge */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-400">
+              <Sparkles className="w-3 h-3" />
+              Powered by Gemini & Pinecone Vector Search
+            </span>
           </div>
 
           {/* Collapsible Category Filter Bar */}
@@ -574,16 +583,16 @@ export function Navbar() {
             {/* Section 1: Search Suggestions */}
             <div>
               <p className="text-[11px] font-medium text-gray-400 px-2 mb-2">
-                Search Suggestions
+                Try Native & Hinglish Queries
               </p>
 
-              {/* If no query typed, show popular suggested items */}
+              {/* If no query typed, show Hinglish/Natural Language AI sample prompts */}
               {!searchQuery.trim() && (
                 <div className="space-y-1">
                   {[
-                    { title: 'iPhone 13', cat: 'Phones', detail: 'A15 Bionic chip • Flagship', tag: 'Phones' },
-                    { title: 'Smart LED Bulb', cat: 'Electronics', detail: 'RGB Smart WiFi Light', tag: 'Smart Home' },
-                    { title: 'Bluetooth Speaker', cat: 'Audio', detail: '360° Surround Sound', tag: 'Best Seller' },
+                    { title: 'Mujhe laptop chaiye 50000 se kam me', cat: 'Laptops', detail: 'Hinglish query translated by Gemini AI', tag: 'Hinglish AI' },
+                    { title: 'Phone under $300 with fast charging', cat: 'Smartphones', detail: 'Vector semantic & price match', tag: 'Smart Search' },
+                    { title: 'Red casual sneakers for sports', cat: 'Footwear', detail: 'Natural language search', tag: 'Semantic' },
                   ].map((item, idx) => (
                     <div
                       key={item.title}
@@ -595,11 +604,11 @@ export function Navbar() {
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center text-gray-400 shrink-0">
-                          <Flame className="w-4 h-4 text-[#3B82F6]" />
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#3B82F6] shrink-0 border border-blue-500/20">
+                          <Sparkles className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{item.title}</p>
+                          <p className="text-sm font-semibold text-white truncate">&ldquo;{item.title}&rdquo;</p>
                           <p className="text-xs text-gray-400 truncate">{item.detail}</p>
                         </div>
                       </div>
